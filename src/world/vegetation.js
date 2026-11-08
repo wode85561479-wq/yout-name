@@ -150,7 +150,7 @@ export function buildVegetation(layout, quality = 'high', renderer = null) {
   const rand = mulberry32(31415);
   const group = new THREE.Group();
   group.name = 'vegetation';
-  CLEAR = makeShots().filter((s) => s.pos.y < 200).map((s) => ({ x: s.pos.x, z: s.pos.z, r2: 11 * 11 }));
+  CLEAR = makeShots().filter((s) => s.pos.y < 200).map((s) => ({ x: s.pos.x, z: s.pos.z, r2: 22 * 22 }));
   const hi = quality !== 'low';
   const occ = layout.occ;
 
