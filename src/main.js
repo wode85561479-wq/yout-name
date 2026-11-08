@@ -23,7 +23,21 @@ import { createAmbience } from './fx/audio.js';
 
 const params = new URLSearchParams(location.search);
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || Math.min(screen.width, screen.height) < 600;
-const quality = params.get('q') || (isMobile ? 'low' : 'high');
+// Weak, integrated or software GPUs start on the light preset; the panel can switch.
+function detectQuality() {
+  if (isMobile) return 'low';
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    if (!gl) return 'low';
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    const lose = gl.getExtension('WEBGL_lose_context');
+    if (lose) lose.loseContext();
+    if (/swiftshader|llvmpipe|software|mali|adreno|powervr|intel(?!.*arc)/i.test(name)) return 'low';
+  } catch (e) { /* fall through */ }
+  return 'high';
+}
+let quality = params.get('q') || (location.hash === '#low' ? 'low' : detectQuality());
 
 const state = {
   hour: params.has('t') ? parseFloat(params.get('t')) : 17.0,
@@ -35,6 +49,7 @@ const state = {
   festival: params.has('festival') ? params.get('festival') !== '0' : !ERA.after,
   after: ERA.after,
   sound: false,
+  lowq: false,
   tour: false,
   uiHidden: false,
   debug: params.has('debug'),
@@ -53,8 +68,9 @@ async function main() {
   patchFogChunks();
   const canvas = document.getElementById('scene');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: params.has('capture') });
-  const maxPR = quality === 'low' ? 1 : 1.6;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxPR));
+  const prFor = (q) => Math.min(window.devicePixelRatio || 1, q === 'low' ? 1 : 1.6);
+  renderer.setPixelRatio(prFor(quality));
+  state.lowq = quality === 'low';
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
@@ -168,7 +184,7 @@ async function main() {
   canvas.addEventListener('wheel', stopAuto, { passive: true });
 
   await step('后期 · 光晕与色彩…', 88);
-  const post = buildPost(renderer, scene, camera, quality);
+  let post = buildPost(renderer, scene, camera, quality);
   post.setSize(window.innerWidth, window.innerHeight);
 
   const hooks = {
@@ -227,6 +243,43 @@ async function main() {
     setSound(on) {
       if (on) ambience.enable().catch(() => {});
       else ambience.disable();
+    },
+
+    // Switch between the full and the light preset without reloading.
+    async setQuality(q) {
+      if (rebuilding || q === quality) return;
+      rebuilding = true;
+      const loaderEl = document.getElementById('loader');
+      loaderEl.classList.remove('done');
+      await new Promise((r) => setTimeout(r, 700));
+      quality = q;
+      state.lowq = q === 'low';
+      const keepPos = camera.position.clone(), keepTarget = controls.target.clone();
+      disposeWorld(world);
+      world = await buildWorld();
+      scene.add(world.group);
+      for (const pass of post.composer.passes) if (pass.dispose) pass.dispose();
+      post.composer.dispose();
+      basePR = prFor(q);
+      perf.scale = 1;
+      renderer.setPixelRatio(basePR);
+      post = buildPost(renderer, scene, camera, q);
+      post.setSize(window.innerWidth, window.innerHeight);
+      const sm = q === 'low' ? 2048 : 4096;
+      sun.shadow.mapSize.set(sm, sm);
+      if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+      camera.position.copy(keepPos);
+      controls.target.copy(keepTarget);
+      controls.update();
+      await step('编译着色器…', 94);
+      try { await renderer.compileAsync(scene, camera); } catch (e) { /* compile lazily */ }
+      await step('完成', 100);
+      renderer.shadowMap.needsUpdate = true;
+      loaderEl.classList.add('done');
+      if (window.__itomori) window.__itomori.stats = world.stats;
+      ui.refresh();
+      rebuilding = false;
+      perf.warm = 4;
     },
 
     // The climax: from the school, watch the fragment fall on the shrine.
@@ -327,7 +380,7 @@ async function main() {
   let captureFrames = 0;
 
   // Dynamic resolution: drop the pixel ratio on slow GPUs, raise it back when there is headroom.
-  const basePR = renderer.getPixelRatio();
+  let basePR = renderer.getPixelRatio();
   const perf = { scale: 1, acc: 0, n: 0, good: 0, warm: 4 };
   function applyScale() {
     const w = window.innerWidth, h = window.innerHeight;

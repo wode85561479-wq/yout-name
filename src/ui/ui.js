@@ -43,6 +43,7 @@ export function buildUI(state, director, shots, hooks) {
     { key: 'split', label: '彗星分裂', onChange: () => {} },
     { key: 'festival', label: '秋祭灯笼', onChange: () => {} },
     { key: 'sound', label: '环境音', onChange: (v) => hooks.setSound(v) },
+    { key: 'lowq', label: '流畅画质', onChange: (v) => hooks.setQuality(v ? 'low' : 'high') },
     { key: 'after', label: '八年后 · 灾后', onChange: (v) => hooks.setEra(v), era: true },
   ];
   const toggleEls = toggles.map((t) => {
