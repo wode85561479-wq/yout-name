@@ -84,7 +84,7 @@ async function main() {
   scene.add(structures.group);
 
   await step('种植杉林…', 66);
-  const veg = buildVegetation(layout, quality);
+  const veg = buildVegetation(layout, quality, renderer);
   scene.add(veg.group);
   const grass = buildGrass(layout, quality);
   scene.add(grass.group);

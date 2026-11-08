@@ -2,11 +2,12 @@
 // town, a sacred grove around the shrine and the great tree of the go-shintai.
 
 import * as THREE from 'three';
-import { mulberry32, createNoise2D } from '../core/noise.js';
+import { mulberry32 } from '../core/noise.js';
 import { toonMaterial } from '../core/materials.js';
 import { terrainHeight, terrainNormal, shoreDistance, SITES, SITE_HEIGHTS, SHINTAI_FLOOR, LAKE_R, STAIRS } from './heightfield.js';
 import { forestDensity } from './terrain.js';
 import { OCC } from './layout.js';
+import { getFoliageAtlas, broadleafCards, cedarCards } from './foliage.js';
 
 // ---------------------------------------------------------------------------
 // Geometry
@@ -64,82 +65,32 @@ function cedarGeometry(tiers = 4, seg = 9, rand = mulberry32(3), { trunk = 4.5, 
 }
 
 function cedarLowGeometry() {
-  // a single cone for distant ridges
-  const g = new THREE.ConeGeometry(3.3, 13, 7, 1, true);
-  g.translate(0, 6.5 + 1.2, 0);
-  const n = g.attributes.position.count;
-  const col = new Float32Array(n * 3);
-  const pos = g.attributes.position, nor = g.attributes.normal;
-  for (let i = 0; i < n; i++) {
-    const y = pos.getY(i);
-    const c = 0.45 + 0.55 * Math.min(1, Math.max(0, (y - 1) / 13));
-    col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = c;
-    const nx = pos.getX(i), nz = pos.getZ(i);
-    const l = Math.hypot(nx, 0.6 * 3, nz) || 1;
-    nor.setXYZ(i, nx / l, (0.6 * 3) / l, nz / l);
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  return g;
-}
-
-function broadleafGeometry(seed = 1, lobes = 5) {
-  const rand = mulberry32(seed);
-  const noise = createNoise2D(seed);
-  const parts = [];
-  // trunk
-  const trunk = new THREE.CylinderGeometry(0.22, 0.35, 4.2, 5, 1, true);
-  trunk.translate(0, 1.6, 0);
-  const tc = new Float32Array(trunk.attributes.position.count * 3);
-  for (let i = 0; i < trunk.attributes.position.count; i++) tc.set([0.2, 0.12, 0.07], i * 3);
-  trunk.setAttribute('color', new THREE.BufferAttribute(tc, 3));
-  parts.push(trunk);
-  const center = new THREE.Vector3(0, 5.6, 0);
-  for (let i = 0; i < lobes; i++) {
-    const r = i === 0 ? 2.6 : 1.3 + rand() * 1.0;
-    const g = new THREE.IcosahedronGeometry(r, i < 3 ? 1 : 0);
-    const a = rand() * Math.PI * 2;
-    const rr = 1.6 + rand() * 1.2;
-    const off = i === 0 ? new THREE.Vector3(0, 0, 0) : new THREE.Vector3(Math.cos(a) * rr, (rand() - 0.25) * 2.6, Math.sin(a) * rr);
-    g.translate(center.x + off.x, center.y + off.y, center.z + off.z);
-    const p = g.attributes.position;
-    const n = g.attributes.normal;
-    const col = new Float32Array(p.count * 3);
-    const v = new THREE.Vector3();
-    for (let k = 0; k < p.count; k++) {
-      v.fromBufferAttribute(p, k);
-      // lumpy surface
-      const d = v.clone().sub(center);
-      const bump = noise(d.x * 0.9 + i, d.z * 0.9 + d.y * 0.7) * 0.42 + noise(d.x * 2.1 - i, d.y * 2.1 + d.z) * 0.15;
-      v.addScaledVector(d.clone().normalize(), bump);
-      p.setXYZ(k, v.x, v.y, v.z);
-      // spherical normals around the whole crown → painterly soft shading
-      const sn = v.clone().sub(center).normalize();
-      sn.y = sn.y * 0.8 + 0.25;
-      sn.normalize();
-      n.setXYZ(k, sn.x, sn.y, sn.z);
-      const ao = 0.55 + 0.45 * Math.min(1, Math.max(0, (v.y - 3.2) / 5.5));
-      col[k * 3] = col[k * 3 + 1] = col[k * 3 + 2] = ao;
-    }
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    parts.push(g.toNonIndexed());
-  }
-  // merge
-  let count = 0;
-  const nonIdx = parts.map((g) => (g.index ? g.toNonIndexed() : g));
-  for (const g of nonIdx) count += g.attributes.position.count;
-  const P = new Float32Array(count * 3), N = new Float32Array(count * 3), Cc = new Float32Array(count * 3);
+  // two stacked open cones: a cheap but recognisably tiered cedar for distant ridges
+  const parts = [[3.4, 8.5, 1.2], [2.3, 7.0, 6.6]].map(([r, h, y]) => {
+    const g = new THREE.ConeGeometry(r, h, 6, 1, true);
+    g.translate(0, y + h / 2, 0);
+    return g.toNonIndexed();
+  });
+  let n = 0;
+  for (const g of parts) n += g.attributes.position.count;
+  const P = new Float32Array(n * 3), N = new Float32Array(n * 3), Cc = new Float32Array(n * 3);
   let o = 0;
-  for (const g of nonIdx) {
-    P.set(g.attributes.position.array, o * 3);
-    N.set(g.attributes.normal.array, o * 3);
-    Cc.set(g.attributes.color.array, o * 3);
-    o += g.attributes.position.count;
+  for (const g of parts) {
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++, o++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      P.set([x, y, z], o * 3);
+      const l = Math.hypot(x, 1.8, z) || 1;
+      N.set([x / l, 1.8 / l, z / l], o * 3);
+      const c = 0.45 + 0.55 * Math.min(1, Math.max(0, (y - 1) / 13));
+      Cc.set([c, c, c], o * 3);
+    }
   }
-  const out = new THREE.BufferGeometry();
-  out.setAttribute('position', new THREE.BufferAttribute(P, 3));
-  out.setAttribute('normal', new THREE.BufferAttribute(N, 3));
-  out.setAttribute('color', new THREE.BufferAttribute(Cc, 3));
-  return out;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(Cc, 3));
+  return g;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +140,7 @@ function toMeshes(scatter, geometry, material, { castShadow = false, shadowRadiu
   return meshes;
 }
 
-export function buildVegetation(layout, quality = 'high') {
+export function buildVegetation(layout, quality = 'high', renderer = null) {
   const rand = mulberry32(31415);
   const group = new THREE.Group();
   group.name = 'vegetation';
@@ -284,27 +235,36 @@ export function buildVegetation(layout, quality = 'high') {
     diffuseColor.rgb *= 0.78 + 0.42 * lc;
   `;
   const cedarMat = toonMaterial({ vertexColors: true }, { key: 'cedar', wind: 0.6, rim: 0.9, trunk: true, fragColor: clump });
-  const leafMat = toonMaterial({ vertexColors: true }, { key: 'leaf', wind: 1.0, rim: 1.1, trunk: true, fragColor: clump });
 
-  const cedarGeo = cedarGeometry(hi ? 5 : 4, hi ? 10 : 7);
+  // near trees are painted cards (alpha-tested leaf / needle sprays)
+  const atlas = getFoliageAtlas(renderer);
+  const softClump = /* glsl */ `
+    float lc = sNoise(vSWPos.xz * 0.6 + vSWPos.y * 0.5);
+    diffuseColor.rgb *= 0.88 + 0.24 * lc;
+  `;
+  const cardParams = { vertexColors: true, map: atlas, alphaTest: 0.42, alphaToCoverage: hi };
+  const cedarCardMat = toonMaterial(cardParams, { key: 'cedar-card', wind: 0.6, rim: 0.9, trunk: true, fragColor: softClump });
+  const leafMat = toonMaterial(cardParams, { key: 'leaf-card', wind: 1.0, rim: 1.1, trunk: true, fragColor: softClump });
+
+  const cedarGeo = cedarCards(3, { tiers: hi ? 5 : 4, perTier: hi ? 7 : 6 });
   const cedarMid = cedarGeometry(3, 7, mulberry32(5));
   // old sacred cedars: tall bare trunks, crown high above the stairs
-  const cedarTall = cedarGeometry(hi ? 6 : 4, hi ? 12 : 8, mulberry32(9), { trunk: 15, crownStart: 9.5, crownLen: 9.5, radius: 2.8 });
+  const cedarTall = cedarCards(9, { tiers: hi ? 6 : 4, perTier: hi ? 8 : 6, trunk: 15, crownStart: 9.5, crownLen: 9.5, radius: 2.8 });
   const cedarLow = cedarLowGeometry();
-  const leafGeo = broadleafGeometry(7, hi ? 6 : 4);
+  const leafGeo = broadleafCards(7, { cards: hi ? 40 : 26 });
 
-  for (const m of toMeshes(cedarsNear, cedarGeo, cedarMat, { castShadow: true, shadowRadius: 1500 })) group.add(m);
+  for (const m of toMeshes(cedarsNear, cedarGeo, cedarCardMat, { castShadow: true, shadowRadius: 1500 })) group.add(m);
   for (const m of toMeshes(cedarsMid, cedarMid, cedarMat, { castShadow: true, shadowRadius: 1700 })) group.add(m);
-  for (const m of toMeshes(grove, cedarTall, cedarMat, { castShadow: true })) group.add(m);
+  for (const m of toMeshes(grove, cedarTall, cedarCardMat, { castShadow: true })) group.add(m);
   for (const m of toMeshes(cedarsFar, cedarLow, cedarMat, { castShadow: false, receive: false })) group.add(m);
   for (const m of toMeshes(broad, leafGeo, leafMat, { castShadow: true, shadowRadius: 1500 })) group.add(m);
 
   // --- the great tree in the go-shintai caldera
   {
     const G = SITES.shintai;
-    const big = new THREE.Mesh(broadleafGeometry(99, 7), leafMat);
+    const big = new THREE.Mesh(broadleafCards(99, { cards: 70, radius: 3.4, height: 5.2 }), leafMat);
     big.position.set(G.x, SHINTAI_FLOOR + 9.5, G.z);
-    big.scale.set(4.6, 4.0, 4.6);
+    big.scale.set(4.4, 3.8, 4.4);
     big.castShadow = true;
     big.receiveShadow = true;
     const c = new THREE.Color('#5f9a3a');
@@ -320,7 +280,7 @@ export function buildVegetation(layout, quality = 'high') {
       const x = G.x + Math.cos(a) * r, z = G.z + Math.sin(a) * r;
       rim.add(x, terrainHeight(x, z) - 0.4, z, 0.8 + rand() * 0.5, rand() * 6.28, pickCol(CEDAR_COLORS));
     }
-    for (const m of toMeshes(rim, cedarGeo, cedarMat, { castShadow: true })) group.add(m);
+    for (const m of toMeshes(rim, cedarGeo, cedarCardMat, { castShadow: true })) group.add(m);
   }
 
   return {
