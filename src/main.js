@@ -19,6 +19,7 @@ import { buildMotes, buildBirds } from './fx/life.js';
 import { buildUI } from './ui/ui.js';
 import { ERA, CRATER2 } from './core/era.js';
 import { buildImpact } from './fx/impact.js';
+import { createAmbience } from './fx/audio.js';
 
 const params = new URLSearchParams(location.search);
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || Math.min(screen.width, screen.height) < 600;
@@ -33,6 +34,7 @@ const state = {
   splitAmt: params.get('split') === '1' ? 1 : 0,
   festival: params.has('festival') ? params.get('festival') !== '0' : !ERA.after,
   after: ERA.after,
+  sound: false,
   tour: false,
   uiHidden: false,
   debug: params.has('debug'),
@@ -130,6 +132,8 @@ async function main() {
   scene.add(birds.object);
   const impact = buildImpact();
   scene.add(impact.object);
+  const ambience = createAmbience();
+  let audioClock = 0;
 
   // Lights
   const sun = new THREE.DirectionalLight(0xffffff, 3);
@@ -218,6 +222,11 @@ async function main() {
       if (director.onShot && !opts.silent) director.onShot(director.current);
       rebuilding = false;
       perf.warm = 4;
+    },
+
+    setSound(on) {
+      if (on) ambience.enable().catch(() => {});
+      else ambience.disable();
     },
 
     // The climax: from the school, watch the fragment fall on the shrine.
@@ -384,6 +393,8 @@ async function main() {
     if ((frameNo++ & 1) === 0 || capture) renderer.shadowMap.needsUpdate = true;
     clouds.update(dt);
     impact.update(dt, renderer.getPixelRatio());
+    audioClock += dt;
+    if (audioClock > 0.25) { audioClock = 0; ambience.update(state.hour, ERA.after); }
     birds.update(time);
     motes.update(camera, renderer.getPixelRatio());
 
