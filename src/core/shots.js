@@ -70,6 +70,7 @@ export function makeShots() {
 }
 
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const reducedMotion = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export class Director {
   constructor(camera, controls, shots) {
@@ -88,6 +89,7 @@ export class Director {
     const shot = typeof idOrIndex === 'number' ? this.shots[idOrIndex] : this.shots.find((s) => s.id === idOrIndex);
     if (!shot) return;
     this.current = shot;
+    if (reducedMotion) duration = 0; // cut instead of flying
     if (this.onShot) this.onShot(shot);
     this.flight = {
       t: 0,

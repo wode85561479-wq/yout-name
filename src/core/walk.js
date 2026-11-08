@@ -12,6 +12,7 @@ export function createWalk(camera, canvas, { groundAt, isWater }) {
   let eyeY = 0;
   const dir = new THREE.Vector3();
   const btn = document.getElementById('walk-btn');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const onKey = (e) => {
     if (!active) return;
@@ -91,7 +92,7 @@ export function createWalk(camera, canvas, { groundAt, isWater }) {
       eyeY += (target - eyeY) * Math.min(1, dt * 10);
       // a gentle footstep bob while moving
       const moving = Math.abs(f) + Math.abs(r) > 0;
-      const bob = moving ? Math.sin(performance.now() * 0.011 * run) * 0.04 : 0;
+      const bob = moving && !reducedMotion ? Math.sin(performance.now() * 0.011 * run) * 0.04 : 0;
       camera.position.set(nx, eyeY + bob, nz);
       camera.rotation.set(pitch, yaw, 0, 'YXZ');
     },
