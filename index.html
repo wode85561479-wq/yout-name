@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>糸守町 · Itomori</title>
+    <meta name="description" content="A procedural three.js tribute to the lakeside town of Itomori, painted in the style of Makoto Shinkai." />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+
+    <div id="loader">
+      <div class="loader-inner">
+        <div class="loader-title">糸守町</div>
+        <div class="loader-sub">ITOMORI · 岐阜県 糸守町</div>
+        <div class="loader-bar"><i id="loader-progress"></i></div>
+        <div class="loader-msg" id="loader-msg">准备中…</div>
+      </div>
+    </div>
+
+    <div id="ui" class="hidden">
+      <div class="brand">
+        <div class="brand-v">糸守</div>
+        <div class="brand-h">
+          <span>ITOMORI</span>
+          <small>Lake Itomori, Gifu</small>
+        </div>
+      </div>
+
+      <div class="caption" id="caption">
+        <div class="caption-name" id="caption-name"></div>
+        <div class="caption-sub" id="caption-sub"></div>
+      </div>
+
+      <div class="panel" id="panel">
+        <div class="time-row">
+          <div class="clock" id="clock">17:00</div>
+          <div class="phase" id="phase">夕方</div>
+        </div>
+        <input type="range" id="hour" min="0" max="24" step="0.01" value="17" aria-label="时间" />
+        <div class="chips" id="time-presets"></div>
+        <div class="chips toggles" id="toggles"></div>
+        <div class="section-label">镜头</div>
+        <div class="chips shots" id="shots"></div>
+      </div>
+
+      <button class="ui-toggle" id="ui-toggle" title="隐藏界面 (H)">✕</button>
+      <div class="hint" id="hint">拖动旋转 · 滚轮缩放 · 右键平移 · 1–8 切换镜头 · T 时间流动 · C 自动漫游 · H 隐藏界面</div>
+      <div class="stats" id="stats"></div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
