@@ -807,7 +807,29 @@ export function buildStructures(layout) {
 
   const group = new THREE.Group();
   group.name = 'structures';
-  const mat = toonMaterial({ vertexColors: true }, { key: 'buildings', rim: 0.35 });
+  // close-up surface detail: tile rows / standing seams on roofs, boards on dark timber walls
+  const surface = /* glsl */ `
+    {
+      vec3 Nw = normalize(vSWNor);
+      float camD = length(vSWPos - cameraPosition);
+      float fade = smoothstep(260.0, 25.0, camD);
+      if (fade > 0.0) {
+        if (Nw.y > 0.3 && Nw.y < 0.97) {
+          vec2 dh = normalize(Nw.xz);
+          float rows = fract(dot(vSWPos.xz, dh) * 2.4);
+          float seam = fract(dot(vSWPos.xz, vec2(-dh.y, dh.x)) * 1.7);
+          float k = (1.0 - smoothstep(0.0, 0.14, rows)) * 0.16 + (1.0 - smoothstep(0.0, 0.1, seam)) * 0.1;
+          diffuseColor.rgb *= 1.0 - k * fade;
+        } else if (abs(Nw.y) < 0.2) {
+          float lum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+          float wood = smoothstep(0.12, 0.05, lum);
+          float board = 1.0 - smoothstep(0.0, 0.1, fract(vSWPos.y * 4.2));
+          diffuseColor.rgb *= 1.0 - board * 0.22 * wood * fade;
+        }
+      }
+    }
+  `;
+  const mat = toonMaterial({ vertexColors: true }, { key: 'buildings', rim: 0.35, fragColor: surface });
   const mesh = new THREE.Mesh(b.build(), mat);
   mesh.castShadow = true;
   mesh.receiveShadow = true;

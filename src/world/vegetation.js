@@ -8,6 +8,7 @@ import { terrainHeight, terrainNormal, shoreDistance, SITES, SITE_HEIGHTS, SHINT
 import { forestDensity } from './terrain.js';
 import { OCC } from './layout.js';
 import { getFoliageAtlas, broadleafCards, cedarCards } from './foliage.js';
+import { makeShots } from '../core/shots.js';
 
 // ---------------------------------------------------------------------------
 // Geometry
@@ -99,9 +100,14 @@ const CEDAR_COLORS = ['#244f31', '#21482d', '#2c5835', '#275238', '#335e33', '#1
 const LEAF_COLORS = ['#4f8f32', '#5d9c38', '#6aa83d', '#468734', '#7aae42', '#3f7c35', '#5a9a3c', '#86b445'];
 const AUTUMN = ['#a8862e', '#b48f3a', '#9a5a30', '#b89a42'];
 
+// keep a little clearing around every preset camera position
+let CLEAR = [];
+const clearOf = (x, z) => { for (const c of CLEAR) if ((x - c.x) ** 2 + (z - c.z) ** 2 < c.r2) return false; return true; };
+
 class Scatter {
   constructor(chunk = 600) { this.chunk = chunk; this.cells = new Map(); }
   add(x, y, z, s, rotY, color, tiltX = 0, tiltZ = 0) {
+    if (!clearOf(x, z)) return;
     const key = `${Math.floor(x / this.chunk)},${Math.floor(z / this.chunk)}`;
     let c = this.cells.get(key);
     if (!c) { c = []; this.cells.set(key, c); }
@@ -144,6 +150,7 @@ export function buildVegetation(layout, quality = 'high', renderer = null) {
   const rand = mulberry32(31415);
   const group = new THREE.Group();
   group.name = 'vegetation';
+  CLEAR = makeShots().filter((s) => s.pos.y < 200).map((s) => ({ x: s.pos.x, z: s.pos.z, r2: 11 * 11 }));
   const hi = quality !== 'low';
   const occ = layout.occ;
 

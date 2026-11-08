@@ -212,6 +212,7 @@ async function main() {
       ui.refresh();
       if (director.onShot) director.onShot(director.current);
       rebuilding = false;
+      perf.warm = 4;
     },
   };
   let rebuilding = false;
@@ -268,11 +269,38 @@ async function main() {
   let fpsAcc = 0, fpsN = 0, fps = 60;
   const capture = params.has('capture');
   let captureFrames = 0;
+
+  // Dynamic resolution: drop the pixel ratio on slow GPUs, raise it back when there is headroom.
+  const basePR = renderer.getPixelRatio();
+  const perf = { scale: 1, acc: 0, n: 0, good: 0, warm: 4 };
+  function applyScale() {
+    const w = window.innerWidth, h = window.innerHeight;
+    const pr = basePR * perf.scale;
+    renderer.setPixelRatio(pr);
+    renderer.setSize(w, h);
+    post.composer.setPixelRatio(pr);
+    post.setSize(w, h);
+    world.lake.userData.resize(w * pr, h * pr);
+  }
+  function adapt(realDt) {
+    if (capture || params.has('fixedres')) return;
+    if (rebuilding || perf.warm > 0) { perf.warm = Math.max(0, perf.warm - realDt); perf.acc = perf.n = 0; return; }
+    perf.acc += realDt; perf.n++;
+    if (perf.acc < 2) return;
+    const f = perf.n / perf.acc;
+    perf.acc = perf.n = 0;
+    if (f < 30 && perf.scale > 0.5) { perf.scale = Math.max(0.5, perf.scale - 0.15); perf.good = 0; applyScale(); perf.warm = 1; }
+    else if (f > 57 && perf.scale < 1) { if (++perf.good >= 2) { perf.scale = Math.min(1, perf.scale + 0.1); perf.good = 0; applyScale(); perf.warm = 1; } }
+    else perf.good = 0;
+  }
+
   function tick(now) {
     if (capture && captureFrames >= 2) return; // headless capture: render a couple of frames, then idle
     captureFrames++;
-    const dt = capture ? 1 / 30 : Math.min(0.1, (now - last) / 1000);
+    const realDt = Math.max(0, (now - last) / 1000);
+    const dt = capture ? 1 / 30 : Math.min(0.1, realDt);
     last = now;
+    adapt(realDt);
     time += dt;
     U.uTime.value = time;
 
@@ -315,7 +343,7 @@ async function main() {
 
     fpsAcc += dt; fpsN++;
     if (fpsAcc > 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
-    ui.update(fps);
+    ui.update(fps, perf.scale);
     requestAnimationFrame(tick);
   }
 

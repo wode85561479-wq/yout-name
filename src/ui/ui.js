@@ -114,7 +114,7 @@ export function buildUI(state, director, shots, hooks) {
     show() { ui.classList.remove('hidden'); state.uiHidden = false; refresh(); },
     refresh,
     setShots,
-    update(fps) {
+    update(fps, scale = 1) {
       const h = ((state.hour % 24) + 24) % 24;
       const hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
       const txt = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
@@ -126,7 +126,7 @@ export function buildUI(state, director, shots, hooks) {
         if (document.activeElement !== slider) slider.value = String(h);
         for (const { el, p } of presetEls) el.classList.toggle('on', Math.abs(p.hour - h) < 0.05);
       }
-      if (state.debug && fps !== undefined) stats.textContent = `${fps.toFixed(0)} fps`;
+      if (state.debug && fps !== undefined) stats.textContent = `${fps.toFixed(0)} fps · res ${(scale * 100).toFixed(0)}%`;
     },
     setTourOff() { state.tour = false; refresh(); },
   };
