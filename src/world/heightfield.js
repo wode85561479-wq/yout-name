@@ -7,6 +7,7 @@
 // on a plateau to the north, and the go-shintai caldera crowns a distant peak.
 
 import { createNoise2D, fbm, ridged, smooth, angDiff, lerp } from '../core/noise.js';
+import { ERA, CRATER2, craterDist } from '../core/era.js';
 
 const nA = createNoise2D(11);
 const nB = createNoise2D(23);
@@ -118,7 +119,7 @@ export function stairHeight(t) {
   return lerp(STAIRS.hA, STAIRS.hB, t);
 }
 
-export function terrainHeight(x, z) {
+function terrainHeightBefore(x, z) {
   let h = baseHeight(x, z);
 
   // School plateau (糸守高校) on the northern foothills.
@@ -176,10 +177,39 @@ export function terrainHeight(x, z) {
   return h;
 }
 
+const nCr = createNoise2D(97);
+
+/** The second crater (after the impact): a steep bowl with a raised, ragged rim. */
+function craterHeight(x, z, h) {
+  const s2 = craterDist(x, z);
+  if (s2 > 340) return h;
+  const a = Math.atan2(z - CRATER2.z, x - CRATER2.x);
+  const wob = 10 * nCr(Math.cos(a) * 2.1 + 3, Math.sin(a) * 2.1 - 1);
+  const s = s2 + wob;
+  let hc;
+  if (s < 0) hc = 0.8 - 50 * (1 - Math.exp(s / 70));
+  else {
+    // wall steepens with distance so it meets the untouched slopes
+    const q = Math.max(0, s - 50);
+    hc = 0.8 + s * 0.13 + q * q * 0.0042 + 1.5 * nCr(x * 0.02, z * 0.02);
+  }
+  const w = smooth(340, 220, s2);
+  let out = h + (Math.min(h, hc) - h) * w;
+  // ejecta rim
+  out += 8 * Math.exp(-Math.pow((s - 26) / 38, 2)) * smooth(-6, 8, s) * w;
+  return out;
+}
+
+export function terrainHeight(x, z) {
+  const h = terrainHeightBefore(x, z);
+  return ERA.after ? craterHeight(x, z, h) : h;
+}
+
 /** Signed distance (m) from the shoreline: negative inside the lake. */
 export function shoreDistance(x, z) {
   const r = Math.hypot(x, z);
-  return r - lakeRadius(Math.atan2(z, x));
+  const d = r - lakeRadius(Math.atan2(z, x));
+  return ERA.after ? Math.min(d, craterDist(x, z)) : d;
 }
 
 export function terrainNormal(x, z, e = 2) {

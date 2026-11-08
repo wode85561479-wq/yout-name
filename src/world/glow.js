@@ -33,6 +33,7 @@ const fragmentShader = /* glsl */ `
 uniform float uTime;
 uniform float uNight;
 uniform float uLanterns;
+uniform float uInhabited;
 uniform vec3 uLightDir;
 uniform vec3 uLightColor;
 uniform vec3 uAmbient;
@@ -72,6 +73,7 @@ void main() {
   else if (kind == 5.0) on = step(vRand, 0.8);
   else if (kind == 1.0) on = uLanterns;
   else on = 1.0;
+  if (kind != 1.0) on *= uInhabited;
   float flick = 1.0;
   if (kind == 1.0) flick = 0.88 + 0.12 * sin(uTime * 7.0 + vRand * 60.0) * sin(uTime * 3.1 + vRand * 17.0);
   // windows come on gradually through the evening

@@ -17,6 +17,7 @@ import { buildClouds } from './sky/clouds.js';
 import { buildPost } from './fx/post.js';
 import { buildMotes, buildBirds } from './fx/life.js';
 import { buildUI } from './ui/ui.js';
+import { ERA } from './core/era.js';
 
 const params = new URLSearchParams(location.search);
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || Math.min(screen.width, screen.height) < 600;
@@ -26,10 +27,11 @@ const state = {
   hour: params.has('t') ? parseFloat(params.get('t')) : 17.0,
   flow: params.get('flow') === '1',
   speed: 0.06, // in-game hours per second
-  comet: params.get('comet') !== '0',
+  comet: params.has('comet') ? params.get('comet') !== '0' : !ERA.after,
   split: params.get('split') === '1',
   splitAmt: params.get('split') === '1' ? 1 : 0,
-  festival: params.get('festival') !== '0',
+  festival: params.has('festival') ? params.get('festival') !== '0' : !ERA.after,
+  after: ERA.after,
   tour: false,
   uiHidden: false,
   debug: params.has('debug'),
@@ -67,30 +69,55 @@ async function main() {
   const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 34000);
   camera.position.set(0, 400, 1200);
 
-  await step('规划町并 · 道路与田地…', 8);
-  const layout = buildLayout({ groundRes: quality === 'low' ? 2048 : 4096 });
-
-  await step('隆起群山 · 陨石湖…', 28);
-  const terrain = buildTerrain(layout, renderer, quality);
-  scene.add(terrain.group);
-
-  await step('糸守湖 · 湖面…', 42);
-  const lake = buildLake(renderer, quality);
-  scene.add(lake);
-  scene.add(buildMoat());
-
-  await step('建造房屋 · 神社 · 高中…', 52);
-  const structures = buildStructures(layout);
-  scene.add(structures.group);
-
-  await step('种植杉林…', 66);
-  const veg = buildVegetation(layout, quality, renderer);
-  scene.add(veg.group);
-  const grass = buildGrass(layout, quality);
-  scene.add(grass.group);
   camera.layers.enable(GRASS_LAYER);
-  // keep the dense grass out of the lake reflection pass
-  lake.getReflectionCamera(camera).layers.disable(GRASS_LAYER);
+
+  // Everything that depends on the era (before / after the impact) lives in
+  // one group so it can be torn down and rebuilt in place.
+  async function buildWorld() {
+    const group = new THREE.Group();
+    group.name = 'world';
+    await step(ERA.after ? '八年后 · 2021 · 规划废墟…' : '规划町并 · 道路与田地…', 8);
+    const layout = buildLayout({ groundRes: quality === 'low' ? 2048 : 4096 });
+    await step(ERA.after ? '第二个火口…' : '隆起群山 · 陨石湖…', 28);
+    const terrain = buildTerrain(layout, renderer, quality);
+    group.add(terrain.group);
+    await step('糸守湖 · 湖面…', 42);
+    const lake = buildLake(renderer, quality);
+    group.add(lake);
+    group.add(buildMoat());
+    await step(ERA.after ? '残存的房屋…' : '建造房屋 · 神社 · 高中…', 52);
+    const structures = buildStructures(layout);
+    group.add(structures.group);
+    await step('种植杉林…', 66);
+    const veg = buildVegetation(layout, quality, renderer);
+    group.add(veg.group);
+    const grass = buildGrass(layout, quality);
+    group.add(grass.group);
+    // keep the dense grass out of the lake reflection pass
+    lake.getReflectionCamera(camera).layers.disable(GRASS_LAYER);
+    U.uInhabited.value = ERA.after ? 0 : 1;
+    return {
+      group, lake, terrain,
+      stats: { houses: layout.houses.length, paddies: layout.paddies.length, structures: structures.stats, vegetation: veg.stats, grass: grass.count },
+    };
+  }
+
+  function disposeWorld(w) {
+    scene.remove(w.group);
+    const mats = new Set();
+    w.group.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => mats.add(m));
+      if (o.isInstancedMesh) o.dispose();
+    });
+    mats.forEach((m) => m.dispose());
+    w.terrain.textures.ground.dispose();
+    w.terrain.textures.mask.dispose();
+    w.lake.getRenderTarget().dispose();
+  }
+
+  let world = await buildWorld();
+  scene.add(world.group);
 
   await step('天空与积云…', 80);
   scene.add(buildSky());
@@ -121,7 +148,7 @@ async function main() {
   controls.maxDistance = 7000;
   controls.maxPolarAngle = Math.PI * 0.72;
   controls.zoomSpeed = 0.9;
-  const shots = makeShots();
+  let shots = makeShots();
   const director = new Director(camera, controls, shots);
   const stopAuto = () => {
     if (director.busy) {
@@ -149,7 +176,45 @@ async function main() {
         state.hour = h;
       }
     },
+    async setEra(after) {
+      if (rebuilding || after === ERA.after) return;
+      rebuilding = true;
+      const keep = director.current ? director.current.id : 'hero';
+      const loaderEl = document.getElementById('loader');
+      loaderEl.classList.remove('done');
+      await new Promise((r) => setTimeout(r, 700));
+      ERA.after = after;
+      state.after = after;
+      state.comet = !after;
+      state.festival = !after;
+      state.split = false;
+      state.splitAmt = 0;
+      director.cancel();
+      state.tour = false;
+      disposeWorld(world);
+      world = await buildWorld();
+      scene.add(world.group);
+      shots = makeShots();
+      director.shots = shots;
+      ui.setShots(shots);
+      director.go(shots.find((s) => s.id === keep) ? keep : 'hero', 0);
+      controls.update();
+      await step('编译着色器…', 94);
+      try { await renderer.compileAsync(scene, camera); } catch (e) { /* compile lazily */ }
+      await step('完成', 100);
+      renderer.shadowMap.needsUpdate = true;
+      loaderEl.classList.add('done');
+      try {
+        if (after) location.hash = 'after';
+        else history.replaceState(null, '', location.pathname + location.search);
+      } catch (e) { /* sandboxed frames may refuse history edits */ }
+      if (window.__itomori) window.__itomori.stats = world.stats;
+      ui.refresh();
+      if (director.onShot) director.onShot(director.current);
+      rebuilding = false;
+    },
   };
+  let rebuilding = false;
   let hourTween = null;
   const ui = buildUI(state, director, shots, hooks);
 
@@ -172,7 +237,7 @@ async function main() {
     camera.updateProjectionMatrix();
     post.setSize(w, h);
     const pr = renderer.getPixelRatio();
-    lake.userData.resize(w * pr, h * pr);
+    world.lake.userData.resize(w * pr, h * pr);
   });
 
   // Shadow frustum follows what the camera is looking at.
@@ -268,7 +333,8 @@ async function main() {
     setHour: (h) => { hourTween = null; state.hour = h; },
     shot: (i) => director.go(i, 0),
     renderFrames: (n = 1) => { captureFrames = 0; const keep = capture; for (let i = 0; i < n; i++) { captureFrames = 0; tick(performance.now()); } return keep; },
-    stats: { houses: layout.houses.length, paddies: layout.paddies.length, structures: structures.stats, vegetation: veg.stats, grass: grass.count },
+    stats: world.stats,
+    setEra: (after) => hooks.setEra(after),
     ready: true,
   };
   if (state.debug) console.log('Itomori stats', window.__itomori.stats, renderer.info);

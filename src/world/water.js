@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { U, GLSL_FOG_PARS, GLSL_COMMON } from '../core/materials.js';
 import { LAKE_R, SHINTAI_MOAT, SITES, lakeRadius } from './heightfield.js';
+import { ERA, CRATER2 } from '../core/era.js';
 
 const WATER_GLSL = /* glsl */ `
 uniform float uTime;
@@ -50,6 +51,7 @@ const fragmentShader = /* glsl */ `
 uniform sampler2D tDiffuse;
 uniform vec3 color;
 uniform float uLakeR;
+uniform vec3 uLake2;
 ${WATER_GLSL}
 ${GLSL_FOG_PARS}
 varying vec4 vUvR;
@@ -70,8 +72,10 @@ void main() {
   uv.xy += N.xz * 0.28 * uv.w * (6.0 / (6.0 + dist * 0.01));
   vec3 refl = texture2DProj(tDiffuse, uv).rgb;
 
-  float r = length(vWorld.xz);
-  float shallow = smoothstep(uLakeR - 70.0, uLakeR + 4.0, r);
+  // distance inside the nearest shore (both basins after the impact)
+  float inside = uLakeR - length(vWorld.xz);
+  if (uLake2.z > 0.0) inside = max(inside, uLake2.z - length(vWorld.xz - uLake2.xy));
+  float shallow = smoothstep(70.0, -4.0, inside);
   vec3 body = mix(uWaterDeep, uWaterShallow, shallow * 0.85);
   // Shinkai lakes read as mirrors: lots of reflection even looking down
   float reflAmt = clamp(0.55 + fres * 0.6 - shallow * 0.25, 0.0, 1.0);
@@ -94,7 +98,7 @@ void main() {
   col += uLightColor * (sheen + glint + glitter) * lightUp;
 
   // a thin bright lip along the shore
-  col += uWaterShallow * smoothstep(uLakeR - 6.0, uLakeR + 2.0, r) * 0.25 * (1.0 - uNight * 0.8);
+  col += uWaterShallow * smoothstep(6.0, -2.0, inside) * 0.25 * (1.0 - uNight * 0.8);
 
   col = shinkaiFog(col, vWorld);
   gl_FragColor = vec4(col, 1.0);
@@ -105,7 +109,8 @@ export function buildLake(renderer, quality = 'high') {
   const scale = quality === 'low' ? 0.35 : 0.6;
   const w = Math.floor(window.innerWidth * Math.min(2, window.devicePixelRatio) * scale);
   const h = Math.floor(window.innerHeight * Math.min(2, window.devicePixelRatio) * scale);
-  const geo = new THREE.CircleGeometry(LAKE_R + 60, 256);
+  // after the impact one mirror spans both basins; land hides the rest
+  const geo = new THREE.CircleGeometry(ERA.after ? Math.hypot(CRATER2.x, CRATER2.z) + CRATER2.R + 60 : LAKE_R + 60, 256);
   const shader = {
     name: 'ItomoriLake',
     uniforms: {
@@ -125,6 +130,7 @@ export function buildLake(renderer, quality = 'high') {
   });
   for (const k in U) lake.material.uniforms[k] = U[k];
   lake.material.uniforms.uLakeR = { value: LAKE_R };
+  lake.material.uniforms.uLake2 = { value: new THREE.Vector3(CRATER2.x, CRATER2.z, ERA.after ? CRATER2.R : 0) };
   lake.rotation.x = -Math.PI / 2;
   lake.position.y = 0;
   lake.name = 'lake';

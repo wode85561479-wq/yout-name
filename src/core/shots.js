@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import { terrainHeight, SITES, SITE_HEIGHTS, STAIRS, valleyCenterZ, lakeRadius, SHINTAI_FLOOR } from '../world/heightfield.js';
+import { ERA, CRATER2 } from './era.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -15,6 +16,22 @@ export function makeShots() {
   const pier = { x: Math.cos(pierTh) * (lakeRadius(pierTh) - 20), z: Math.sin(pierTh) * (lakeRadius(pierTh) - 20) };
   const streetX = 760;
   const streetZ = valleyCenterZ(streetX) + 72;
+
+  if (ERA.after) {
+    // Eight years on: the second crater, the deserted streets, the surviving school.
+    const C = CRATER2;
+    const away = new THREE.Vector2(S.x - C.x, S.z - C.z).normalize();
+    const rim = { x: C.x + away.x * (C.R + 70), z: C.z + away.y * (C.R + 70) };
+    return [
+      { id: 'hero', name: '瓢箪形的糸守湖', sub: '八年后 · 高中后山远眺', pos: V(S.x + 40, sh + 95, S.z + 90), target: V(-170, 40, 60), drift: V(40, 6, -10), fov: 58 },
+      { id: 'crater', name: '新的火口湖', sub: '宫水神社旧址', pos: V(rim.x, terrainHeight(rim.x, rim.z) + 24, rim.z), target: V(C.x - away.x * 120, 0, C.z - away.y * 120), drift: V(-away.y * 30, 2, away.x * 30), fov: 55 },
+      { id: 'street', name: '无人的街道', sub: '电线杆仍然立着', pos: V(streetX, terrainHeight(streetX, streetZ) + 1.8, streetZ + 1.2), target: V(streetX - 260, terrainHeight(streetX - 260, streetZ) + 22, valleyCenterZ(streetX - 260) + 66), drift: V(-24, 0.2, 0), fov: 55 },
+      { id: 'shore', name: '湖畔栈桥', sub: '对岸是新湖', pos: V(pier.x + 6, 4.2, pier.z + 4), target: V(-420, 60, -120), drift: V(-10, 0.5, 14), fov: 50 },
+      { id: 'aerial', name: '鸟瞰', sub: '两个火口相连', pos: V(700, 1500, 1500), target: V(-150, 0, -200), drift: V(-240, -40, 0), fov: 45 },
+      { id: 'shintai', name: '御神体', sub: '山顶火口', pos: V(G.x - toTown.x * 168, SHINTAI_FLOOR + 44, G.z - toTown.y * 168), target: V(G.x + toTown.x * 40, SHINTAI_FLOOR + 16, G.z + toTown.y * 40), drift: V(-toTown.y * 30, 4, toTown.x * 30), fov: 50 },
+      { id: 'school', name: '糸守高中', sub: '当年的避难所', pos: V(S.x + 40, sh + 2.2, S.z + 70), target: V(S.x - 10, sh + 9, S.z - 40), drift: V(-20, 0.5, 0), fov: 52 },
+    ];
+  }
 
   return [
     {

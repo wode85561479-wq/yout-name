@@ -5,6 +5,7 @@ import { Builder, jitter } from './builder.js';
 import { mulberry32 } from '../core/noise.js';
 import { toonMaterial, lineMaterial } from '../core/materials.js';
 import { glowMaterial } from './glow.js';
+import { ERA, craterDist } from '../core/era.js';
 import {
   terrainHeight, SITES, SITE_HEIGHTS, STAIRS, stairHeight, lakeRadius, valleyCenterZ, shoreDistance, SHINTAI_FLOOR,
 } from './heightfield.js';
@@ -122,6 +123,20 @@ function buildHouse(b, win, h) {
 
   // foundation sunk into the slope
   b.box(0, 0, w + 0.3, d + 0.3, -3, plinth, FOUND);
+  if (h.ruined) {
+    // eight years after the blast: broken walls, no roof, rubble
+    const dark = wallC.map((v) => v * 0.55);
+    const wood = woodC.map((v) => v * 0.6);
+    for (const [cx, cz, ww, dd] of [[0, d / 2 - 0.15, w, 0.3], [0, -d / 2 + 0.15, w, 0.3], [w / 2 - 0.15, 0, 0.3, d], [-w / 2 + 0.15, 0, 0.3, d]]) {
+      const hh = 0.6 + rand() * 2.2;
+      b.box(cx, cz, ww, dd, plinth, plinth + hh, rand() < 0.5 ? dark : wood);
+    }
+    for (let i = 0; i < 6; i++) {
+      const rx = (rand() - 0.5) * w, rz = (rand() - 0.5) * d;
+      b.box(rx, rz, 0.8 + rand() * 1.8, 0.6 + rand() * 1.4, plinth, plinth + 0.3 + rand() * 0.6, rand() < 0.5 ? roofC.map((v) => v * 0.6) : dark);
+    }
+    return;
+  }
   const yWall0 = plinth;
   const y1 = yWall0 + floorH * nF;
   // walls: Hida-style dark timber skirt under pale plaster
@@ -658,6 +673,7 @@ function buildGuardrails(b) {
     const x = Math.cos(th) * R, z = Math.sin(th) * R;
     if (Math.abs(z - valleyCenterZ(x)) < 12 && x > 0) continue; // bridge
     if (Math.abs(th - 0.36) < 0.03) continue; // pier
+    if (ERA.after && craterDist(x, z) < 24) continue;
     const y = terrainHeight(x, z);
     b.setFrame(x, y, z, th);
     b.box(0, 0, 0.12, 0.12, -0.3, 0.75, '#bdbcb5');
@@ -746,7 +762,7 @@ export function buildStructures(layout) {
   for (const h of layout.houses) buildHouse(b, win, h);
   buildSchool(b, win);
   buildTownHall(b, win, layout.townHall);
-  buildShrine(b, win, lanternSpots);
+  if (!ERA.after) buildShrine(b, win, lanternSpots);
   buildShintai(b);
   buildSubstation(b, layout.substation);
   buildPylons(b, wirePts, layout.substation);
@@ -779,7 +795,7 @@ export function buildStructures(layout) {
     } else lantern(s.x, s.y, s.z, true);
   }
   // main street festival lanterns hanging from the pole wires
-  for (const tl of poleTops.slice(0, 3)) {
+  for (const tl of ERA.after ? [] : poleTops.slice(0, 3)) {
     for (let i = 0; i < tl.length - 1; i++) {
       const a = tl[i][3], c = tl[i + 1][3];
       for (let k = 1; k < 6; k++) {

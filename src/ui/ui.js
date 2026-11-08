@@ -42,22 +42,30 @@ export function buildUI(state, director, shots, hooks) {
     { key: 'comet', label: '彗星', onChange: () => {} },
     { key: 'split', label: '彗星分裂', onChange: () => {} },
     { key: 'festival', label: '秋祭灯笼', onChange: () => {} },
+    { key: 'after', label: '八年后 · 灾后', onChange: (v) => hooks.setEra(v), era: true },
   ];
   const toggleEls = toggles.map((t) => {
     const el = chip(t.label, () => {
       state[t.key] = !state[t.key];
       t.onChange(state[t.key]);
       refresh();
-    });
+    }, t.era ? 'era' : '');
     $('toggles').appendChild(el);
     return { el, t };
   });
 
-  const shotEls = shots.map((s, i) => {
-    const el = chip(`${i + 1} ${s.name}`, () => { director.stopTour(); state.tour = false; director.go(i); refresh(); });
-    $('shots').appendChild(el);
-    return { el, s };
-  });
+  let shotEls = [];
+  function setShots(list) {
+    shots = list;
+    $('shots').replaceChildren();
+    shotEls = list.map((s, i) => {
+      const el = chip(`${i + 1} ${s.name}`, () => { director.stopTour(); state.tour = false; director.go(i); refresh(); });
+      $('shots').appendChild(el);
+      return { el, s };
+    });
+    refresh();
+  }
+  setShots(shots);
 
   slider.addEventListener('input', () => { hooks.setHour(parseFloat(slider.value), false); });
 
@@ -92,6 +100,7 @@ export function buildUI(state, director, shots, hooks) {
     else if (k === 'h') setHidden(!state.uiHidden);
     else if (k === 'k') state.comet = !state.comet;
     else if (k === 'f') state.festival = !state.festival;
+    else if (k === 'y') { hooks.setEra(!state.after); return; }
     refresh();
   });
 
@@ -104,6 +113,7 @@ export function buildUI(state, director, shots, hooks) {
   return {
     show() { ui.classList.remove('hidden'); state.uiHidden = false; refresh(); },
     refresh,
+    setShots,
     update(fps) {
       const h = ((state.hour % 24) + 24) % 24;
       const hh = Math.floor(h), mm = Math.floor((h - hh) * 60);

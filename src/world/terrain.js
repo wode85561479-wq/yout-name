@@ -9,6 +9,7 @@ import {
 import { createNoise2D, fbm, smooth, clamp } from '../core/noise.js';
 import { toonMaterial, U } from '../core/materials.js';
 import { GROUND } from './layout.js';
+import { ERA, craterDist } from '../core/era.js';
 
 const nCol = createNoise2D(77);
 const nCol2 = createNoise2D(91);
@@ -19,6 +20,7 @@ export function forestDensity(x, z, slope, townDensity) {
   const th = Math.atan2(z, x);
   const s = r - lakeRadius(th);
   if (s < 5) return 0;
+  if (ERA.after && craterDist(x, z) < 90) return 0;
   const fw = flatWidth(th);
   let f = smooth(fw * 0.55, fw * 1.02, s);
   f = Math.max(f, smooth(0.2, 0.42, slope) * smooth(8, 50, s));
@@ -51,6 +53,7 @@ const PAL = {
   deep: C('#2b3b36'),
   far: C('#3b5c43'),
   calderaGrass: C('#9dc25a'),
+  scar: C('#8d7d63'),
 };
 const tmp = new THREE.Color();
 const tmp2 = new THREE.Color();
@@ -66,6 +69,14 @@ function groundColor(out, x, z, h, slope, townDensity) {
     out.copy(PAL.sand).lerp(PAL.bed, smooth(-1, -14, s));
     out.lerp(PAL.deep, smooth(-14, -120, s));
     return out;
+  }
+  if (ERA.after) {
+    const s2 = craterDist(x, z);
+    if (s2 < 0) {
+      out.copy(PAL.sand).lerp(PAL.bed, smooth(-1, -14, s2));
+      out.lerp(PAL.deep, smooth(-14, -120, s2));
+      return out;
+    }
   }
 
   // meadow with variation
@@ -91,6 +102,15 @@ function groundColor(out, x, z, h, slope, townDensity) {
     out.lerp(PAL.sand, smooth(18, 12, md) * 0.6);
   }
 
+  // scorched crater walls, eight years into their regrowth
+  if (ERA.after) {
+    const s2 = craterDist(x, z);
+    if (s2 < 170) {
+      const bare = smooth(170, 25, s2) * (0.55 + 0.45 * smooth(-0.4, 0.5, n2));
+      out.lerp(PAL.scar, bare * 0.85);
+      out.lerp(PAL.rock, smooth(0.45, 0.8, slope) * smooth(140, 40, s2) * 0.6);
+    }
+  }
   // distant ranges lean blue-green
   out.lerp(PAL.far, smooth(3500, 7000, r) * 0.7);
   // a hint of height tint

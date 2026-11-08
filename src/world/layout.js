@@ -2,6 +2,7 @@
 // the painted ground texture. Everything is seeded and deterministic.
 
 import { mulberry32, smooth } from '../core/noise.js';
+import { ERA, CRATER2, craterDist } from '../core/era.js';
 import {
   terrainHeight, lakeRadius, flatWidth, valleyCenterZ, shoreDistance,
   SITES, STAIRS, LAKE_R,
@@ -158,9 +159,14 @@ export function buildLayout({ groundRes = 4096 } = {}) {
 
   // --- Special sites --------------------------------------------------------
   occ.markCircle(SITES.school.x, SITES.school.z, SITES.school.r + 6, OCC.SPECIAL);
-  occ.markCircle(SITES.shrine.x, SITES.shrine.z, SITES.shrine.r + 10, OCC.SPECIAL);
-  // stairway corridor
-  occ.markPolyline([STAIRS.a, STAIRS.b], 6, OCC.SPECIAL);
+  if (ERA.after) {
+    // the new crater lake swallowed the shrine and the heart of the old town
+    occ.markCircle(CRATER2.x, CRATER2.z, CRATER2.R + 34, OCC.WATER);
+  } else {
+    occ.markCircle(SITES.shrine.x, SITES.shrine.z, SITES.shrine.r + 10, OCC.SPECIAL);
+    // stairway corridor
+    occ.markPolyline([STAIRS.a, STAIRS.b], 6, OCC.SPECIAL);
+  }
 
   const subZ = valleyCenterZ(1130) - 175;
   const substation = { x: 1130, z: subZ, w: 72, d: 48, rot: 0.08 };
@@ -221,6 +227,32 @@ export function buildLayout({ groundRes = 4096 } = {}) {
 
   // ring road poles only along the inhabited shores
   roads[0].poleRange = [-2.15, 0.9];
+
+  if (ERA.after) {
+    // cut every road where it runs into the crater
+    const cut = [];
+    for (const rd of roads) {
+      let run = [];
+      let first = true;
+      const flush = () => {
+        if (run.length > 1) {
+          const piece = { ...rd, pts: run, closed: false };
+          if (!first) delete piece.poleRange; // the ring's poles are generated once, by angle
+          first = false;
+          cut.push(piece);
+        }
+        run = [];
+      };
+      for (const p of rd.pts) {
+        if (craterDist(p.x, p.z) < 14) flush();
+        else run.push(p);
+      }
+      flush();
+    }
+    // keep the ring road first so the pole range logic still applies
+    roads.length = 0;
+    roads.push(...cut);
+  }
 
   for (const rd of roads) occ.markPolyline(rd.pts, rd.width / 2 + 0.8, OCC.ROAD);
 
@@ -296,7 +328,7 @@ export function buildLayout({ groundRes = 4096 } = {}) {
   }
 
   // Miyamizu residence beside the stair foot.
-  {
+  if (!ERA.after) {
     const p = polar(-2.47, lakeRadius(-2.47) + 58);
     houses.push({ x: p.x, z: p.z, y: terrainHeight(p.x, p.z) - 1, top: 0, w: 17, d: 11, rot: -2.47 + Math.PI / 2, floors: 2, seed: 0.42, kind: 'manor' });
     occ.markRect(p.x, p.z, 26, 20, -2.47 + Math.PI / 2, OCC.BUILDING);
@@ -393,7 +425,7 @@ export function buildLayout({ groundRes = 4096 } = {}) {
       const nx = -(b.z - a.z) / L, nz = (b.x - a.x) / L;
       const off = rd.width / 2 + 0.9;
       const x = rs[i].x + nx * off, z = rs[i].z + nz * off;
-      if (shoreDistance(x, z) < 8) { if (line.length > 1) poleLines.push(line.splice(0)); else line.length = 0; continue; }
+      if (shoreDistance(x, z) < 8 || (ERA.after && craterDist(x, z) < 40)) { if (line.length > 1) poleLines.push(line.splice(0)); else line.length = 0; continue; }
       line.push({ x, z, y: terrainHeight(x, z), rot: Math.atan2(b.z - a.z, b.x - a.x) });
     }
     if (line.length > 1) poleLines.push(line);
@@ -408,6 +440,17 @@ export function buildLayout({ groundRes = 4096 } = {}) {
   const thP = 0.36;
   const pierBase = polar(thP, lakeRadius(thP) + 4);
   const pier = { x: pierBase.x, z: pierBase.z, rot: thP + Math.PI, len: 46 };
+
+  // Eight years on: houses close to the rim were wrecked by the blast.
+  if (ERA.after) {
+    for (let i = houses.length - 1; i >= 0; i--) {
+      const d = craterDist(houses[i].x, houses[i].z);
+      if (d < 220) {
+        if (rand() < 0.55 * (1 - d / 260)) houses.splice(i, 1);
+        else houses[i].ruined = d < 160 || rand() < 0.3;
+      }
+    }
+  }
 
   const layout = {
     occ, roads, houses, paddies, fields, yardTrees, river, props, poleLines,
@@ -536,7 +579,7 @@ function paintGround(L, res) {
   }
 
   // Shrine terrace gravel + approach.
-  {
+  if (!ERA.after) {
     const S = SITES.shrine;
     ctx.beginPath();
     const [cx, cy] = P(S);

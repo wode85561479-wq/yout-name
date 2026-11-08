@@ -36,6 +36,7 @@ export const U = {
   uCirrus: { value: 0.6 },
   uWind: { value: 1 },
   uLanterns: { value: 0 },
+  uInhabited: { value: 1 },
 };
 
 // ---------------------------------------------------------------------------
