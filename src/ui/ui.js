@@ -42,6 +42,7 @@ export function buildUI(state, director, shots, hooks) {
     { key: 'comet', label: '彗星', onChange: () => {} },
     { key: 'split', label: '彗星分裂', onChange: () => {} },
     { key: 'festival', label: '秋祭灯笼', onChange: () => {} },
+    { key: 'walk', label: '漫步模式', onChange: (v) => hooks.setWalk(v) },
     { key: 'sound', label: '环境音', onChange: (v) => hooks.setSound(v) },
     { key: 'lowq', label: '流畅画质', onChange: (v) => hooks.setQuality(v ? 'low' : 'high') },
     { key: 'after', label: '八年后 · 灾后', onChange: (v) => hooks.setEra(v), era: true },
@@ -108,6 +109,7 @@ export function buildUI(state, director, shots, hooks) {
     else if (k === 'f') state.festival = !state.festival;
     else if (k === 'y') { hooks.setEra(!state.after); return; }
     else if (k === 'm') { state.sound = !state.sound; hooks.setSound(state.sound); }
+    else if (k === 'g') { hooks.setWalk(!state.walk); return; }
     refresh();
   });
 

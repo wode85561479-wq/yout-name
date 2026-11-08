@@ -7,13 +7,12 @@ import { toonMaterial, lineMaterial } from '../core/materials.js';
 import { glowMaterial } from './glow.js';
 import { ERA, craterDist } from '../core/era.js';
 import {
-  terrainHeight, SITES, SITE_HEIGHTS, STAIRS, stairHeight, lakeRadius, valleyCenterZ, shoreDistance, SHINTAI_FLOOR,
+  terrainHeight, SITES, SITE_HEIGHTS, STAIRS, stairHeight, lakeRadius, valleyCenterZ, SHINTAI_FLOOR,
 } from './heightfield.js';
 
 const WALLS = ['#e4dccc', '#dcd0bc', '#cfc2aa', '#e6e2d8', '#c6bba6', '#8a6446', '#6e4e38', '#b2a998', '#ddd3bf'];
 const ROOFS = ['#3d4c5e', '#55687c', '#8b3f2f', '#46668a', '#2f3842', '#6b4b3b', '#3f6a5d', '#5c6670', '#7a3a33', '#2e5a7a', '#384a40'];
 const WOOD = '#5a3c2a';
-const WOOD_DARK = '#3b281d';
 const FOUND = '#8f8b82';
 
 const WIN_WARM = [1.55, 1.0, 0.5];

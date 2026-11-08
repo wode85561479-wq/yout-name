@@ -11,7 +11,8 @@ import { buildLake, buildMoat } from './world/water.js';
 import { buildStructures } from './world/buildings.js';
 import { buildVegetation } from './world/vegetation.js';
 import { buildGrass, GRASS_LAYER } from './world/grass.js';
-import { terrainHeight } from './world/heightfield.js';
+import { terrainHeight, shoreDistance } from './world/heightfield.js';
+import { createWalk } from './core/walk.js';
 import { buildSky } from './sky/sky.js';
 import { buildClouds } from './sky/clouds.js';
 import { buildPost } from './fx/post.js';
@@ -50,6 +51,7 @@ const state = {
   after: ERA.after,
   sound: false,
   lowq: false,
+  walk: false,
   tour: false,
   uiHidden: false,
   debug: params.has('debug'),
@@ -181,6 +183,7 @@ async function main() {
     }
   };
   canvas.addEventListener('pointerdown', stopAuto);
+  const walk = createWalk(camera, canvas, { groundAt: terrainHeight, isWater: (x, z) => shoreDistance(x, z) < 2 });
   canvas.addEventListener('wheel', stopAuto, { passive: true });
 
   await step('后期 · 光晕与色彩…', 88);
@@ -240,6 +243,22 @@ async function main() {
       perf.warm = 4;
     },
 
+    setWalk(on) {
+      if (on === walk.active) return;
+      state.walk = on;
+      if (on) {
+        director.cancel();
+        state.tour = false;
+        walk.enable();
+        ui.caption('漫步模式', 'WASD / 方向键移动 · 拖动环顾 · Shift 快走');
+      } else {
+        controls.target.copy(walk.lookTarget());
+        walk.disable();
+        controls.update();
+      }
+      ui.refresh();
+    },
+
     setSound(on) {
       if (on) ambience.enable().catch(() => {});
       else ambience.disable();
@@ -286,6 +305,7 @@ async function main() {
     async startImpact() {
       if (ERA.after || rebuilding || inSequence) return;
       inSequence = true;
+      hooks.setWalk(false);
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       director.cancel();
       Object.assign(state, { tour: false, flow: false, comet: true, split: true, festival: true });
@@ -429,8 +449,10 @@ async function main() {
 
     if (state.tour && !director.tour) director.startTour();
     director.update(dt);
-    controls.enabled = !director.flight && !fallCam;
-    if (fallCam) {
+    if (walk.active && director.flight) hooks.setWalk(false); // a preset shot ends the stroll
+    controls.enabled = !director.flight && !fallCam && !walk.active;
+    if (walk.active) walk.update(dt);
+    else if (fallCam) {
       const k = impact.progress;
       const e = THREE.MathUtils.smoothstep(k, 0.3, 0.97);
       fallCam.look.lerpVectors(fallCam.t0, fallCam.t1, e);
