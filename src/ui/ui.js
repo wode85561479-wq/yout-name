@@ -54,6 +54,10 @@ export function buildUI(state, director, shots, hooks) {
     return { el, t };
   });
 
+  const fallBtn = chip('▶ 彗星坠落', () => hooks.startImpact(), 'action');
+  fallBtn.title = '从高中看彗星碎片落下，然后到八年后';
+  $('toggles').appendChild(fallBtn);
+
   let shotEls = [];
   function setShots(list) {
     shots = list;
@@ -105,6 +109,7 @@ export function buildUI(state, director, shots, hooks) {
   });
 
   function refresh() {
+    fallBtn.hidden = !!state.after;
     for (const { el, t } of toggleEls) el.classList.toggle('on', !!state[t.key]);
     for (const { el, s } of shotEls) el.classList.toggle('on', director.current === s);
   }
@@ -114,6 +119,13 @@ export function buildUI(state, director, shots, hooks) {
     show() { ui.classList.remove('hidden'); state.uiHidden = false; refresh(); },
     refresh,
     setShots,
+    caption(name, sub) {
+      capName.textContent = name;
+      capSub.textContent = sub || '';
+      caption.classList.add('show');
+      clearTimeout(capTimer);
+      capTimer = setTimeout(() => caption.classList.remove('show'), 5200);
+    },
     update(fps, scale = 1) {
       const h = ((state.hour % 24) + 24) % 24;
       const hh = Math.floor(h), mm = Math.floor((h - hh) * 60);

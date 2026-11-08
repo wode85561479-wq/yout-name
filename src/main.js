@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { patchFogChunks, U } from './core/materials.js';
-import { applyTimeOfDay, TOD } from './core/timeofday.js';
+import { applyTimeOfDay, TOD, COMET_HEAD, COMET_TAIL } from './core/timeofday.js';
 import { makeShots, Director } from './core/shots.js';
 import { buildLayout } from './world/layout.js';
 import { buildTerrain } from './world/terrain.js';
@@ -17,7 +17,8 @@ import { buildClouds } from './sky/clouds.js';
 import { buildPost } from './fx/post.js';
 import { buildMotes, buildBirds } from './fx/life.js';
 import { buildUI } from './ui/ui.js';
-import { ERA } from './core/era.js';
+import { ERA, CRATER2 } from './core/era.js';
+import { buildImpact } from './fx/impact.js';
 
 const params = new URLSearchParams(location.search);
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || Math.min(screen.width, screen.height) < 600;
@@ -127,6 +128,8 @@ async function main() {
   scene.add(motes.object);
   const birds = buildBirds();
   scene.add(birds.object);
+  const impact = buildImpact();
+  scene.add(impact.object);
 
   // Lights
   const sun = new THREE.DirectionalLight(0xffffff, 3);
@@ -176,13 +179,15 @@ async function main() {
         state.hour = h;
       }
     },
-    async setEra(after) {
+    async setEra(after, opts = {}) {
       if (rebuilding || after === ERA.after) return;
       rebuilding = true;
       const keep = director.current ? director.current.id : 'hero';
       const loaderEl = document.getElementById('loader');
-      loaderEl.classList.remove('done');
-      await new Promise((r) => setTimeout(r, 700));
+      if (!opts.silent) {
+        loaderEl.classList.remove('done');
+        await new Promise((r) => setTimeout(r, 700));
+      }
       ERA.after = after;
       state.after = after;
       state.comet = !after;
@@ -203,18 +208,60 @@ async function main() {
       try { await renderer.compileAsync(scene, camera); } catch (e) { /* compile lazily */ }
       await step('完成', 100);
       renderer.shadowMap.needsUpdate = true;
-      loaderEl.classList.add('done');
+      if (!opts.silent) loaderEl.classList.add('done');
       try {
         if (after) location.hash = 'after';
         else history.replaceState(null, '', location.pathname + location.search);
       } catch (e) { /* sandboxed frames may refuse history edits */ }
       if (window.__itomori) window.__itomori.stats = world.stats;
       ui.refresh();
-      if (director.onShot) director.onShot(director.current);
+      if (director.onShot && !opts.silent) director.onShot(director.current);
       rebuilding = false;
       perf.warm = 4;
     },
+
+    // The climax: from the school, watch the fragment fall on the shrine.
+    async startImpact() {
+      if (ERA.after || rebuilding || inSequence) return;
+      inSequence = true;
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      director.cancel();
+      Object.assign(state, { tour: false, flow: false, comet: true, split: true, festival: true });
+      hooks.setHour(20.3, true);
+      director.go('hero', 3.5);
+      ui.refresh();
+      await wait(5200);
+      await new Promise((resolve) => startFall(resolve));
+      const flash = document.getElementById('flash');
+      flash.classList.add('on');
+      await wait(900);
+      await hooks.setEra(true, { silent: true });
+      hooks.setHour(15.6, false);
+      director.go('hero', 0);
+      controls.update();
+      await wait(600);
+      flash.classList.remove('on');
+      ui.caption('八年后', '2021 · 糸守町跡');
+      inSequence = false;
+    },
   };
+  let inSequence = false;
+  // start where the split fragment sits in the sky, end on the shrine grounds
+  // while the fragment falls the camera stays put and pans after it
+  let fallCam = null;
+  function startFall(onDone) {
+    fallCam = { t0: controls.target.clone(), t1: new THREE.Vector3(CRATER2.x, 30, CRATER2.z), look: new THREE.Vector3(), base: camera.position.clone() };
+    const H = COMET_HEAD.clone(), T = COMET_TAIL.clone();
+    const B = new THREE.Vector3().crossVectors(H, T).normalize();
+    const dir = H.clone().addScaledVector(T, -0.065).addScaledVector(B, -0.03).normalize();
+    const to = new THREE.Vector3(CRATER2.x, 4, CRATER2.z);
+    impact.start(camera.position.clone(), dir, to, 9.5, () => {
+      controls.target.copy(fallCam.look);
+      camera.position.copy(fallCam.base);
+      fallCam = null;
+      onDone();
+    });
+  }
   let rebuilding = false;
   let hourTween = null;
   const ui = buildUI(state, director, shots, hooks);
@@ -320,8 +367,15 @@ async function main() {
 
     if (state.tour && !director.tour) director.startTour();
     director.update(dt);
-    controls.enabled = !director.flight;
-    controls.update();
+    controls.enabled = !director.flight && !fallCam;
+    if (fallCam) {
+      const k = impact.progress;
+      const e = THREE.MathUtils.smoothstep(k, 0.3, 0.97);
+      fallCam.look.lerpVectors(fallCam.t0, fallCam.t1, e);
+      const shake = THREE.MathUtils.smoothstep(k, 0.82, 1.0) * 1.6;
+      camera.position.copy(fallCam.base).add(new THREE.Vector3((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake));
+      camera.lookAt(fallCam.look);
+    } else controls.update();
     // keep the camera above ground
     const gy = Math.max(terrainHeight(camera.position.x, camera.position.z), 0) + 1.6;
     if (camera.position.y < gy) camera.position.y = gy;
@@ -329,6 +383,7 @@ async function main() {
     updateShadow();
     if ((frameNo++ & 1) === 0 || capture) renderer.shadowMap.needsUpdate = true;
     clouds.update(dt);
+    impact.update(dt, renderer.getPixelRatio());
     birds.update(time);
     motes.update(camera, renderer.getPixelRatio());
 
@@ -363,6 +418,8 @@ async function main() {
     renderFrames: (n = 1) => { captureFrames = 0; const keep = capture; for (let i = 0; i < n; i++) { captureFrames = 0; tick(performance.now()); } return keep; },
     stats: world.stats,
     setEra: (after) => hooks.setEra(after),
+    startImpact: () => hooks.startImpact(),
+    previewFall: (k) => { startFall(() => {}); const n = Math.floor((9.5 * k) / (1 / 30)); for (let i = 0; i < n; i++) impact.update(1 / 30, renderer.getPixelRatio()); },
     ready: true,
   };
   if (state.debug) console.log('Itomori stats', window.__itomori.stats, renderer.info);
