@@ -35,7 +35,7 @@ export function forestDensity(x, z, slope, townDensity) {
   if (townDensity) f *= 1 - 0.92 * townDensity(x, z);
   // patchy clearings on the slopes
   const n = fbm(nCol2, x * 0.004, z * 0.004, 2);
-  f *= smooth(-0.72, -0.48, n);
+  f *= smooth(-0.82, -0.62, n);
   return clamp(f, 0, 1);
 }
 

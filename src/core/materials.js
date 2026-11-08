@@ -37,6 +37,7 @@ export const U = {
   uWind: { value: 1 },
   uLanterns: { value: 0 },
   uInhabited: { value: 1 },
+  uCloudShadow: { value: 0.5 },
 };
 
 // ---------------------------------------------------------------------------
@@ -212,15 +213,23 @@ uniform vec3 uSkyHorizon;
 uniform vec3 uSkyTop;
 uniform vec3 uWaterDeep;
 uniform vec3 uWaterShallow;
+uniform float uCloudShadow;
 varying vec3 vSWPos;
 varying vec3 vSWNor;
 ${GLSL_COMMON}
+float cloudShade(vec2 p) {
+  vec2 q = p * 0.00085 + vec2(uTime * 0.0045, uTime * 0.0021);
+  float n = sNoise(q) * 0.65 + sNoise(q * 2.3 + 7.1) * 0.35;
+  return smoothstep(0.56, 0.68, n);
+}
 ${opts.fragPars || ''}`
     );
     fs = fs.replace('#include <color_fragment>', `#include <color_fragment>\n${opts.fragColor || ''}`);
     fs = fs.replace(
       '#include <lights_fragment_end>',
       `#include <lights_fragment_end>
+  // drifting shadows of the cumulus overhead
+  reflectedLight.directDiffuse *= 1.0 - cloudShade(vSWPos.xz) * uCloudShadow;
 #ifdef STYLE_RIM
   {
     vec3 Vw = normalize(cameraPosition - vSWPos);

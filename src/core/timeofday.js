@@ -118,6 +118,8 @@ export function applyTimeOfDay(hour, { sunLight, hemiLight, comet = true, cometS
   U.uCometHead.value.copy(COMET_HEAD);
   U.uCometTail.value.copy(COMET_TAIL);
   U.uLanterns.value = THREE.MathUtils.smoothstep(p.night, 0.15, 0.6);
+  // cloud shadows are a daytime thing; they fade as the light gets low
+  U.uCloudShadow.value = 0.55 * THREE.MathUtils.smoothstep(sunDir.y, 0.08, 0.35) * (1 - p.night);
 
   TOD.sunVisible = sunUp;
   Object.assign(TOD, { sunI: p.sunI, hemiI: p.hemiI, exp: p.exp, bloom: p.bloom, night: p.night, stars: p.stars, fog: p.fog, rays: p.rays });
