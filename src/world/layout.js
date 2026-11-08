@@ -334,7 +334,7 @@ export function buildLayout({ groundRes = 4096 } = {}) {
       const r0 = r + 1, r1 = r + 20;
       const t0 = th + 0.6 / r, t1 = th + dth - 0.6 / r;
       const corners = [polar(t0, r0), polar(t1, r0), polar(t1, r1), polar(t0, r1)];
-      addPaddy(corners, rand() < 0.03);
+      addPaddy(corners, rand() < 0.015);
     }
   }
   // valley paddies aligned with the river
@@ -344,7 +344,7 @@ export function buildLayout({ groundRes = 4096 } = {}) {
       const z1 = valleyCenterZ(x + 25) + dz;
       const corners = [{ x, z: z0 }, { x: x + 25, z: z1 }, { x: x + 25, z: z1 + 17.5 }, { x, z: z0 + 17.5 }];
       if (rand() < 0.08) continue;
-      addPaddy(corners, rand() < 0.03);
+      addPaddy(corners, rand() < 0.015);
     }
   }
 
@@ -522,7 +522,7 @@ function paintGround(L, res) {
     const S = SITES.school;
     const gx = S.x + 8, gz = S.z + 34;
     rect(S.x, S.z, 210, 190, 0); ctx.fillStyle = 'rgba(132,150,88,1)'; ctx.fill();
-    rect(gx, gz, 128, 82, 0); ctx.fillStyle = '#c8b27e'; ctx.fill();
+    rect(gx, gz, 128, 82, 0); ctx.fillStyle = '#b09a6c'; ctx.fill();
     ctx.strokeStyle = 'rgba(250,250,240,0.9)';
     ctx.lineWidth = Math.max(1, 0.5 * k);
     for (const inset of [10, 14]) {

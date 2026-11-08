@@ -113,17 +113,17 @@ vec3 comet(vec3 d) {
 
   if (uCometSplit > 0.001) {
     // The fragment separating from the nucleus, trailing its own glowing wake.
-    vec2 off = vec2(0.035, 0.022) * uCometSplit;
+    vec2 off = vec2(0.065, 0.03) * uCometSplit;
     float u2 = u + off.x, v2 = v + off.y;
     float rr = u2 * u2 + v2 * v2;
-    c += vec3(1.0, 0.85, 0.9) * (exp(-rr / 0.0000018) * 7.0 + exp(-rr / 0.00003) * 1.0) * uCometSplit;
+    c += vec3(1.0, 0.85, 0.9) * (exp(-rr / 0.0000022) * 8.0 + exp(-rr / 0.00004) * 1.3 + exp(-rr / 0.0005) * 0.2) * uCometSplit;
     // wake pointing back towards the main nucleus
     vec2 dirw = normalize(off);
     float a = dot(vec2(u2, v2), dirw);
     float pp = dot(vec2(u2, v2), vec2(-dirw.y, dirw.x));
     if (a > 0.0) {
-      float ww = 0.0012 + a * 0.06;
-      float wake = exp(-(pp * pp) / (ww * ww)) * exp(-a * 25.0) * smoothstep(0.0, 0.004, a);
+      float ww = 0.0014 + a * 0.05;
+      float wake = exp(-(pp * pp) / (ww * ww)) * exp(-a * 13.0) * smoothstep(0.0, 0.004, a);
       c += mix(vec3(1.0, 0.6, 0.8), vec3(0.6, 0.85, 1.0), clamp(a * 30.0, 0.0, 1.0)) * wake * 1.4 * uCometSplit;
     }
   }

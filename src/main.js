@@ -28,7 +28,7 @@ const state = {
   speed: 0.06, // in-game hours per second
   comet: params.get('comet') !== '0',
   split: params.get('split') === '1',
-  splitAmt: 0,
+  splitAmt: params.get('split') === '1' ? 1 : 0,
   festival: params.get('festival') !== '0',
   tour: false,
   uiHidden: false,
@@ -268,7 +268,7 @@ async function main() {
     setHour: (h) => { hourTween = null; state.hour = h; },
     shot: (i) => director.go(i, 0),
     renderFrames: (n = 1) => { captureFrames = 0; const keep = capture; for (let i = 0; i < n; i++) { captureFrames = 0; tick(performance.now()); } return keep; },
-    stats: { structures: structures.stats, vegetation: veg.stats, grass: grass.count },
+    stats: { houses: layout.houses.length, paddies: layout.paddies.length, structures: structures.stats, vegetation: veg.stats, grass: grass.count },
     ready: true,
   };
   if (state.debug) console.log('Itomori stats', window.__itomori.stats, renderer.info);

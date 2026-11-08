@@ -15,8 +15,8 @@ const WOOD = '#5a3c2a';
 const WOOD_DARK = '#3b281d';
 const FOUND = '#8f8b82';
 
-const WIN_WARM = [2.4, 1.55, 0.75];
-const WIN_COOL = [1.6, 1.8, 2.1];
+const WIN_WARM = [1.55, 1.0, 0.5];
+const WIN_COOL = [1.0, 1.15, 1.35];
 
 function addWindowsOnWall(win, rand, { x0, x1, z, y0, y1, out, n, ww, wh, kind = 0, axis = 'x' }) {
   const span = x1 - x0;
@@ -25,7 +25,7 @@ function addWindowsOnWall(win, rand, { x0, x1, z, y0, y1, out, n, ww, wh, kind =
     const cy = (y0 + y1) / 2;
     win.rnd = rand();
     win.kind = kind;
-    win.emit = kind === 5 ? [2.2, 1.7, 1.0] : rand() < 0.2 ? WIN_COOL : WIN_WARM;
+    win.emit = kind === 5 ? [1.5, 1.15, 0.7] : rand() < 0.2 ? WIN_COOL : WIN_WARM;
     const glass = kind === 5 ? '#e8e0cc' : '#2b3a4a';
     const hw = ww / 2, hh = wh / 2;
     if (axis === 'x') {
@@ -312,13 +312,18 @@ function torii(b, x, y, z, rot, scale = 1) {
   b.box(0, 0, 0.36 * s, 0.25 * s, H - 0.9 * s, H, VERMILION);
 }
 
-function stoneLantern(b, x, y, z, s = 1) {
+function stoneLantern(b, x, y, z, s = 1, glow = null) {
+  if (glow) {
+    glow.setFrame(x, y, z, 0);
+    glow.kind = 2; glow.rnd = 0.5; glow.emit = [2.0, 1.3, 0.6];
+    glow.box(0, 0, 0.52 * s, 0.52 * s, 1.65 * s, 2.05 * s, '#d8cfb8', { top: false });
+  }
   b.setFrame(x, y, z, 0);
   const c = '#a7a395';
   b.box(0, 0, 0.9 * s, 0.9 * s, 0, 0.3 * s, c);
   b.cylinder(0, 0, 0.18 * s, 0.16 * s, 0.3 * s, 1.4 * s, 8, c);
   b.box(0, 0, 0.7 * s, 0.7 * s, 1.4 * s, 1.6 * s, c);
-  b.box(0, 0, 0.5 * s, 0.5 * s, 1.6 * s, 2.1 * s, '#8f8b7e');
+  for (const [px, pz] of [[-0.22, -0.22], [0.22, -0.22], [0.22, 0.22], [-0.22, 0.22]]) b.box(px * s, pz * s, 0.1 * s, 0.1 * s, 1.6 * s, 2.1 * s, '#8f8b7e', { top: false });
   b.box(0, 0, 1.0 * s, 1.0 * s, 2.1 * s, 2.25 * s, c);
   b.box(0, 0, 0.5 * s, 0.5 * s, 2.25 * s, 2.5 * s, c);
 }
@@ -361,7 +366,7 @@ function buildShrine(b, win, glowList) {
     }
   }
   // stone lanterns and festival lantern posts beside the stairs
-  for (let t = 0.04; t < 1; t += 0.085) {
+  for (let t = 0.03; t < 1; t += 0.06) {
     for (const side of [-1, 1]) {
       const off = side * (STAIRS.width / 2 + 1.6);
       const x = STAIRS.a.x + dir.x * STAIRS.len * t - dir.z * off;
@@ -450,11 +455,16 @@ function buildShrine(b, win, glowList) {
   // stone lanterns flanking the approach + komainu plinths
   for (const sx of [-4.5, 4.5]) {
     const p = toW(sx, 9);
-    stoneLantern(b, p.x, y, p.z, 1.1);
+    stoneLantern(b, p.x, y, p.z, 1.1, win);
     const q = toW(sx * 0.7, 13);
     b.setFrame(q.x, y, q.z, fr);
     b.box(0, 0, 1.0, 1.4, 0, 1.0, stone);
     b.box(0, 0, 0.6, 0.9, 1.0, 1.9, '#9a968a');
+  }
+  // lanterns hanging under the haiden eaves
+  for (let i = 0; i < 6; i++) {
+    const p = toW(-6.5 + i * 2.6, 2.4);
+    glowList.push({ x: p.x, y: y + 4.6, z: p.z, kind: 'hang' });
   }
   // festival lanterns strung across the terrace
   for (let i = 0; i < 14; i++) {
@@ -628,7 +638,7 @@ function buildPoles(b, wires, glow, poleLines) {
         glow.setFrame(p.x, p.y, p.z, p.rot);
         glow.kind = 2;
         glow.rnd = Math.random();
-        glow.emit = [3.2, 2.7, 1.9];
+        glow.emit = [2.2, 1.85, 1.3];
         glow.box(0, -1.55, 0.35, 0.5, H - 3.25, H - 3.05, '#d8d8d0');
       }
     }
@@ -754,7 +764,7 @@ export function buildStructures(layout) {
     lanternBuilder.setFrame(x, y, z, 0);
     lanternBuilder.kind = 1;
     lanternBuilder.rnd = Math.random();
-    lanternBuilder.emit = red ? [3.4, 1.1, 0.55] : [3.2, 2.4, 1.3];
+    lanternBuilder.emit = red ? [2.6, 0.8, 0.4] : [2.4, 1.8, 1.0];
     const c = red ? '#d8452f' : '#f2e6c8';
     lanternBuilder.cylinder(0, 0, 0.13, 0.22, -0.34, -0.12, 10, c, { top: false });
     lanternBuilder.cylinder(0, 0, 0.22, 0.22, -0.12, 0.12, 10, c, { top: false });

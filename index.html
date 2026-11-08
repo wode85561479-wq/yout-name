@@ -21,7 +21,7 @@
 
     <div id="ui" class="hidden">
       <div class="brand">
-        <div class="brand-v">糸守</div>
+        <div class="brand-v" aria-label="糸守"><span>糸</span><span>守</span></div>
         <div class="brand-h">
           <span>ITOMORI</span>
           <small>Lake Itomori, Gifu</small>
@@ -37,12 +37,15 @@
         <div class="time-row">
           <div class="clock" id="clock">17:00</div>
           <div class="phase" id="phase">夕方</div>
+          <button class="collapse" id="collapse" type="button" aria-label="展开/收起" title="展开/收起">▾</button>
         </div>
         <input type="range" id="hour" min="0" max="24" step="0.01" value="17" aria-label="时间" />
-        <div class="chips" id="time-presets"></div>
-        <div class="chips toggles" id="toggles"></div>
-        <div class="section-label">镜头</div>
-        <div class="chips shots" id="shots"></div>
+        <div class="panel-body">
+          <div class="chips" id="time-presets"></div>
+          <div class="chips toggles" id="toggles"></div>
+          <div class="section-label">镜头</div>
+          <div class="chips shots" id="shots"></div>
+        </div>
       </div>
 
       <button class="ui-toggle" id="ui-toggle" title="隐藏界面 (H)">✕</button>

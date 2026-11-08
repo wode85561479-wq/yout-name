@@ -61,6 +61,10 @@ export function buildUI(state, director, shots, hooks) {
 
   slider.addEventListener('input', () => { hooks.setHour(parseFloat(slider.value), false); });
 
+  const panel = $('panel');
+  if (window.matchMedia('(max-width: 720px)').matches) panel.classList.add('collapsed');
+  $('collapse').addEventListener('click', () => panel.classList.toggle('collapsed'));
+
   let capTimer = 0;
   director.onShot = (s) => {
     capName.textContent = s.name;
